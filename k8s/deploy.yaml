@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: md-link-pedido-compra-service
+  labels:
+    app: md-link-pedido-compra-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: md-link-pedido-compra-service
+  template:
+    metadata:
+      labels:
+        app: md-link-pedido-compra-service
+    spec:
+      containers:
+      - name: md-link-pedido-compra-service
+        image: registry.digitalocean.com/oondemand/md-link-pedido-compra-service:start
+        ports:
+        - containerPort: 4006
+        envFrom:
+        - secretRef:
+            name: vitta-env-secret
