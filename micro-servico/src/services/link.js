@@ -1,8 +1,7 @@
 const crypto = require("crypto");
 const ejs = require("ejs");
-const { format } = require('date-fns');
-const { ptBR } = require('date-fns/locale');
-
+const { format } = require("date-fns");
+const { ptBR } = require("date-fns/locale");
 
 const msAppOmie = require("../config/msAppOmie");
 const msTemplateEJS = require("../config/msTemplateEJS");
@@ -13,20 +12,25 @@ const pedidoCompraService = require("./omie/pedidoCompraService");
 const contaPagarService = require("./omie/contaPagarService");
 const departamentoService = require("./omie/departamentoService");
 const clienteService = require("./omie/clienteService");
+const msEmail = require("../config/msEmail");
 
-const link = async (appKey, nCodPed, autor) => {
+const link = async (secretKey, appKey, nCodPed, autor) => {
   console.log(`Iniciando processo de link entre pedido de compra ${nCodPed} e contas a pagar`);
 
-  const resEmpresa = await msAppOmie.get(`empresas?appKey=${appKey}`);
+  const resEmpresa = await msAppOmie.get(`app-omie?secretKey=${secretKey}&appKey=${appKey}`);
   const empresa = resEmpresa.data[0];
+  if (!empresa) throw new Error("Empresa não encontrada");
 
   const pedido = await pedidoCompraService.consultar(empresa.appKey, empresa.appSecret, nCodPed);
-
-  const dataAtual = format(new Date(), 'dd/MM/yy HH:mm', { locale: ptBR });
+  if (!pedido) throw new Error("Pedido de compra não encontrado");
 
   try {
+    const dataAtual = format(new Date(), "dd/MM/yy HH:mm", { locale: ptBR });
+
     let msg = "Link para contas a pagar:\n";
-    const resTemplate = await msTemplateEJS.get(`templates?nome=pedido-de-compra`);
+    const resTemplate = await msTemplateEJS.get(
+      `template?secretKey=${secretKey}&nome=pedido-de-compra`
+    );
     const template = resTemplate.data[0].templateEjs;
 
     const departamentos = await departamentoService.listar(empresa.appKey, empresa.appSecret);
@@ -38,7 +42,7 @@ const link = async (appKey, nCodPed, autor) => {
 
     const variaveisTemplate = { pedido, departamentos, fornecedor, autor, empresa, dataAtual };
     const renderedHtml = await ejs.render(template, variaveisTemplate);
-    const pdfBuffer = await gerarPDF(renderedHtml);
+    const pdfBuffer = await gerarPDF(secretKey, renderedHtml);
 
     const totalParcelas = pedido.parcelas_consulta.length;
 
@@ -60,6 +64,7 @@ const link = async (appKey, nCodPed, autor) => {
       const id = contaIncluida.codigo_lancamento_omie;
 
       await incluirAnexo(
+        secretKey,
         empresa.appKey,
         empresa.appSecret,
         id,
@@ -69,12 +74,15 @@ const link = async (appKey, nCodPed, autor) => {
       msg += `Conta ${id} cadastrada\n`;
       console.log(`Conta ${id} cadastrada\n`);
 
-      await delay(5000);
+      await delay(3000);
     }
 
+    console.log("Alterando etapa do pedido de compra...");
     const novaObs = msg + pedido.cabecalho_consulta.cObs;
     const pedidoNovo = pedidoAlterado(pedido.cabecalho_consulta.nCodPed, novaObs);
     pedidoCompraService.alterar(empresa.appKey, empresa.appSecret, pedidoNovo);
+
+    await enviarEmail(pedido, fornecedor, autor);
 
     console.log("Processo finalizado");
   } catch (error) {
@@ -89,7 +97,8 @@ const link = async (appKey, nCodPed, autor) => {
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const incluirAnexo = async (appKey, appSecret, id, arquivo, numeroPedido) => {
+const incluirAnexo = async (secretKey, appKey, appSecret, id, arquivo, numeroPedido) => {
+  console.log("Incluindo anexo...");
   try {
     const requestBody = {
       appKey,
@@ -101,17 +110,18 @@ const incluirAnexo = async (appKey, appSecret, id, arquivo, numeroPedido) => {
       arquivo,
     };
 
-    const response = await msAnexoOmie.post("incluir-anexo", requestBody);
+    const response = await msAnexoOmie.post(`incluir-anexo?secretKey=${secretKey}`, requestBody);
     return response.data;
   } catch (error) {
     throw ("Erro ao incluir anexo: ", error);
   }
 };
 
-const gerarPDF = async (html) => {
+const gerarPDF = async (secretKey, html) => {
+  console.log("Gerando PDF...");
   try {
     const response = await msGeradorPDF.post(
-      "gerar-pdf",
+      `gerar-pdf?secretKey=${secretKey}`,
       { html },
       { responseType: "arraybuffer" }
     );
@@ -158,6 +168,28 @@ const criarConta = async (pedido, parcela, dataVencimento, valor) => {
     distribuicao,
   };
   return conta;
+};
+
+const enviarEmail = async (pedido, fornecedor, autor) => {
+  const emailDestinatario = `${autor.email},${process.env.EMAIL_FINANCEIRO},fabio.anaia.aiello@gmail.com,fabio@pdvseven.com.br`;
+  console.log(`Enviando emails para ${emailDestinatario}...`);
+
+  try {
+    const email = {
+      remetente: {
+        email: "notificacao@oondemand.com.br",
+        nome: "notificação oondemand",
+      },
+      emailDestinatario,
+      assunto: `Conta a Pagar Criada - Pedido N. ${pedido.cabecalho_consulta.cNumero}`,
+      mensagem: `Compra do Fornecedor: ${fornecedor.razao_social} aprovada e gerado Conta a Pagar`,
+    };
+
+    const response = await msEmail.post("enviar-email", email);
+    return response.data;
+  } catch (error) {
+    console.log("Erro ao enviar email: ", error);
+  }
 };
 
 module.exports = { link };
