@@ -27,8 +27,9 @@ const start = async () => {
     res.status(500).send("Erro interno no servidor");
   });
 
-  server = app.listen(process.env.PORT, () => {
-    console.log(`Serviço ${process.env.SERVICE_NAME} subiu na porta ${process.env.PORT}`);
+  const porta = process.env.PORT || 3000;
+  server = app.listen(porta, () => {
+    console.log(`Serviço ${process.env.SERVICE_NAME} subiu na porta ${porta}`);
   });
 
   return server;
