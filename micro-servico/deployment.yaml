@@ -14,13 +14,13 @@ spec:
     spec:
       containers:
       - name: md-link-pedidocompra-contapagar-ms-container
-        image: registry.digitalocean.com/oondemand/md-link-pedidocompra-contapagar-ms:0.0.1
+        image: registry.digitalocean.com/oondemand/md-link-pedidocompra-contapagar-ms:0.0.2
         ports:
         - containerPort: 3000
         resources:
           requests:
-            memory: "512Mi"
-            cpu: "0.5"
+            memory: "128Mi"
+            cpu: "0.1"
           limits:
             memory: "1024Mi"
             cpu: "1"
