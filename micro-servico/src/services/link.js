@@ -88,7 +88,10 @@ const link = async (secretKey, appKey, nCodPed, autor) => {
   } catch (error) {
     console.log("Erro ao processar link pedido de compra para contas a pagar: ", error);
 
+    
     const msg = "Erro ao processar Link: " + error;
+    await enviarEmailErro(pedido, error, autor);
+    
     const novaObs = msg + pedido.cabecalho_consulta.cObs;
     const pedidoNovo = pedidoAlterado(pedido.cabecalho_consulta.nCodPed, novaObs);
     pedidoCompraService.alterar(empresa.appKey, empresa.appSecret, pedidoNovo);
@@ -183,6 +186,28 @@ const enviarEmail = async (pedido, fornecedor, autor) => {
       emailDestinatario,
       assunto: `Conta a Pagar Criada - Pedido N. ${pedido.cabecalho_consulta.cNumero}`,
       mensagem: `Compra do Fornecedor: ${fornecedor.razao_social} aprovada e gerado Conta a Pagar`,
+    };
+
+    const response = await msEmail.post("enviar-email", email);
+    return response.data;
+  } catch (error) {
+    console.log("Erro ao enviar email: ", error);
+  }
+};
+
+const enviarEmailErro = async (pedido, erro, autor) => {
+  const emailDestinatario = `${autor.email}`;
+  console.log(`Enviando emails para ${emailDestinatario}...`);
+
+  try {
+    const email = {
+      remetente: {
+        email: "notificacao@oondemand.com.br",
+        nome: "notificação oondemand",
+      },
+      emailDestinatario,
+      assunto: `Erro Processando Pedido N. ${pedido.cabecalho_consulta?.cNumero}`,
+      mensagem: `Erro gerando contas a pagar: ${erro}`,
     };
 
     const response = await msEmail.post("enviar-email", email);
