@@ -17,14 +17,19 @@ const msEmail = require("../config/msEmail");
 const link = async (secretKey, appKey, nCodPed, autor) => {
   console.log(`Iniciando processo de link entre pedido de compra ${nCodPed} e contas a pagar`);
 
-  const resEmpresa = await msAppOmie.get(`app-omie?secretKey=${secretKey}&appKey=${appKey}`);
-  const empresa = resEmpresa.data[0];
-  if (!empresa) throw new Error("Empresa não encontrada");
-
-  const pedido = await pedidoCompraService.consultar(empresa.appKey, empresa.appSecret, nCodPed);
-  if (!pedido) throw new Error("Pedido de compra não encontrado");
+  let empresa;
+  let pedido;
 
   try {
+    const resEmpresa = await msAppOmie.get(`app-omie?secretKey=${secretKey}&appKey=${appKey}`);
+    empresa = resEmpresa.data[0];
+    if (!empresa) {
+      console.log("Empresa não encontrada: ", secretKey, appKey);
+      throw new Error("Empresa não encontrada");
+    }
+
+    const pedido = await pedidoCompraService.consultar(empresa.appKey, empresa.appSecret, nCodPed);
+    if (!pedido) throw new Error("Pedido de compra não encontrado");
     const dataAtual = format(new Date(), "dd/MM/yy HH:mm", { locale: ptBR });
 
     let msg = "Link para contas a pagar:\n";
@@ -88,10 +93,9 @@ const link = async (secretKey, appKey, nCodPed, autor) => {
   } catch (error) {
     console.log("Erro ao processar link pedido de compra para contas a pagar: ", error);
 
-    
     const msg = "Erro ao processar Link: " + error;
     await enviarEmailErro(pedido, error, autor);
-    
+
     const novaObs = msg + pedido.cabecalho_consulta.cObs;
     const pedidoNovo = pedidoAlterado(pedido.cabecalho_consulta.nCodPed, novaObs);
     pedidoCompraService.alterar(empresa.appKey, empresa.appSecret, pedidoNovo);
@@ -174,7 +178,7 @@ const criarConta = async (pedido, parcela, dataVencimento, valor) => {
 };
 
 const enviarEmail = async (pedido, fornecedor, autor) => {
-  const emailDestinatario = `${autor.email},${process.env.EMAIL_FINANCEIRO},fabio.anaia.aiello@gmail.com,fabio@pdvseven.com.br`;
+  const emailDestinatario = `${autor.email},${process.env.EMAIL_FINANCEIRO}`;
   console.log(`Enviando emails para ${emailDestinatario}...`);
 
   try {

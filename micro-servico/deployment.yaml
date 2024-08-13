@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: md-link-pedidocompra-contapagar-ms-container
-        image: registry.digitalocean.com/oondemand/md-link-pedidocompra-contapagar-ms:0.0.2
+        image: registry.digitalocean.com/oondemand/md-link-pedidocompra-contapagar-ms:0.0.5
         ports:
         - containerPort: 3000
         resources:
